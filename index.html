@@ -1,0 +1,1973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Sketch Brawl — Indie Multiplayer</title>
+<style>
+  :root {
+    --ink: #1a1a2e;
+    --paper: #f5f0e8;
+    --accent: #e94560;
+    --accent-2: #0f3460;
+    --btn-bg: #16213e;
+    --btn-text: #f5f0e8;
+  }
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    user-select: none;
+  }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  #game-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+    cursor: crosshair;
+    background: var(--paper);
+  }
+  /* ---------- UI Overlay ---------- */
+  #ui {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    pointer-events: auto;
+    background: rgba(26, 26, 46, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: opacity 0.25s ease;
+  }
+  .screen.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .screen h1 {
+    font-size: clamp(2rem, 6vw, 3.5rem);
+    color: var(--paper);
+    letter-spacing: -0.03em;
+    font-weight: 800;
+    text-shadow: 2px 2px 0 var(--accent);
+  }
+  .screen p {
+    color: rgba(245, 240, 232, 0.7);
+    font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+    max-width: 480px;
+    text-align: center;
+    line-height: 1.5;
+  }
+  .btn {
+    pointer-events: auto;
+    min-width: 200px;
+    min-height: 52px;
+    padding: 14px 32px;
+    border: 2px solid var(--accent);
+    border-radius: 12px;
+    background: var(--btn-bg);
+    color: var(--btn-text);
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: transform 0.1s ease, background 0.15s ease;
+    box-shadow: 0 4px 0 var(--accent-2);
+  }
+  .btn:active {
+    transform: translateY(3px);
+    box-shadow: 0 1px 0 var(--accent-2);
+  }
+  .btn.secondary {
+    border-color: rgba(245, 240, 232, 0.3);
+    box-shadow: 0 4px 0 rgba(0, 0, 0, 0.3);
+    font-size: 0.95rem;
+    min-width: 160px;
+    min-height: 44px;
+  }
+  .btn.secondary:active {
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+  }
+  #room-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: min(90vw, 420px);
+    max-height: 40vh;
+    overflow-y: auto;
+    padding: 4px;
+  }
+  .room-item {
+    pointer-events: auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--btn-bg);
+    border: 1.5px solid rgba(245, 240, 232, 0.15);
+    border-radius: 10px;
+    color: var(--paper);
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+  }
+  .room-item:active {
+    border-color: var(--accent);
+  }
+  .room-item .count {
+    font-size: 0.8rem;
+    color: rgba(245, 240, 232, 0.5);
+  }
+  #join-code-input {
+    pointer-events: auto;
+    width: 200px;
+    height: 48px;
+    padding: 0 16px;
+    border: 2px solid rgba(245, 240, 232, 0.25);
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    color: var(--paper);
+    font-size: 1.1rem;
+    text-align: center;
+    letter-spacing: 0.1em;
+    outline: none;
+  }
+  #join-code-input:focus {
+    border-color: var(--accent);
+  }
+  /* ---------- In-Game HUD ---------- */
+  #hud {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 5;
+    display: none;
+  }
+  #hud.visible {
+    display: block;
+  }
+  .hud-top {
+    position: absolute;
+    top: max(12px, env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    padding: 8px 20px;
+    background: rgba(26, 26, 46, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 12px;
+    border: 1px solid rgba(245, 240, 232, 0.1);
+  }
+  .hud-top .round {
+    color: var(--paper);
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+  .hud-top .timer {
+    color: var(--accent);
+    font-weight: 800;
+    font-size: 1.3rem;
+    font-variant-numeric: tabular-nums;
+    min-width: 2.5em;
+    text-align: center;
+  }
+  .hud-bottom {
+    position: absolute;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    pointer-events: none;
+  }
+  .weapon-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    background: rgba(26, 26, 46, 0.75);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 12px;
+    border: 1.5px solid var(--accent);
+  }
+  .weapon-card img {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+    image-rendering: auto;
+  }
+  .weapon-card .info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .weapon-card .name {
+    color: var(--paper);
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .weapon-card .status {
+    color: var(--accent);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  /* ---------- Joystick visuals ---------- */
+  .joystick-base {
+    position: absolute;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    border: 2px dashed rgba(26, 26, 46, 0.35);
+    background: rgba(245, 240, 232, 0.1);
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    display: none;
+  }
+  .joystick-knob {
+    position: absolute;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: rgba(26, 26, 46, 0.5);
+    border: 2px solid rgba(245, 240, 232, 0.6);
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    display: none;
+  }
+  /* ---------- Toast ---------- */
+  #toast {
+    position: fixed;
+    bottom: max(90px, calc(env(safe-area-inset-bottom) + 80px));
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 10px 24px;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.9rem;
+    border-radius: 8px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 20;
+    white-space: nowrap;
+  }
+  #toast.show {
+    opacity: 1;
+  }
+  /* ---------- No-texture fallback ---------- */
+  .no-texture {
+    width: 40px;
+    height: 40px;
+    background:
+      linear-gradient(45deg, transparent 45%, #e94560 45%, #e94560 55%, transparent 55%),
+      linear-gradient(-45deg, transparent 45%, #e94560 45%, #e94560 55%, transparent 55%),
+      #2a2a3e;
+    border: 1px solid #e94560;
+    border-radius: 4px;
+  }
+  /* ---------- Responsive tweaks ---------- */
+  @media (max-width: 600px) {
+    .screen h1 { font-size: 2rem; }
+    .btn { min-width: 160px; min-height: 46px; font-size: 1rem; }
+    .hud-top { padding: 6px 14px; gap: 12px; }
+    .weapon-card img { width: 32px; height: 32px; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="game-canvas"></canvas>
+
+<!-- ============ UI OVERLAY ============ -->
+<div id="ui">
+
+  <!-- Main Menu -->
+  <div id="screen-menu" class="screen">
+    <h1>SKETCH BRAWL</h1>
+    <p>One weapon per round. One use. Destroy the map. Outlast everyone.</p>
+    <button class="btn" id="btn-start-host">Start Game (Host)</button>
+    <button class="btn secondary" id="btn-show-join">Join a Room</button>
+  </div>
+
+  <!-- Server / Room Browser -->
+  <div id="screen-servers" class="screen hidden">
+    <h1>ROOMS</h1>
+    <p>Live rooms hosted by other iPads and devices.</p>
+    <div id="room-list"></div>
+    <input id="join-code-input" type="text" placeholder="ROOM CODE" maxlength="8" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+    <button class="btn secondary" id="btn-join-code">Join by Code</button>
+    <button class="btn secondary" id="btn-back-menu">Back</button>
+  </div>
+
+  <!-- Waiting / Lobby -->
+  <div id="screen-lobby" class="screen hidden">
+    <h1>LOBBY</h1>
+    <p id="lobby-code-display">Room code: —</p>
+    <p id="lobby-players">Players: 1</p>
+    <button class="btn" id="btn-begin-round">Begin Round</button>
+    <button class="btn secondary" id="btn-leave-lobby">Leave</button>
+  </div>
+
+  <!-- Round Over -->
+  <div id="screen-round-over" class="screen hidden">
+    <h1 id="round-over-title">ROUND OVER</h1>
+    <p id="round-over-detail"></p>
+    <button class="btn" id="btn-next-round">Next Round</button>
+  </div>
+
+</div>
+
+<!-- ============ IN-GAME HUD ============ -->
+<div id="hud">
+  <div class="hud-top">
+    <span class="round" id="hud-round">ROUND 1</span>
+    <span class="timer" id="hud-timer">0:00</span>
+    <span class="round" id="hud-players">2 alive</span>
+  </div>
+  <div class="hud-bottom">
+    <div class="weapon-card" id="hud-weapon">
+      <div class="no-texture" id="hud-weapon-icon"></div>
+      <div class="info">
+        <span class="name" id="hud-weapon-name">—</span>
+        <span class="status" id="hud-weapon-status">READY</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Joystick visuals -->
+<div class="joystick-base" id="joy-left-base"></div>
+<div class="joystick-knob" id="joy-left-knob"></div>
+<div class="joystick-base" id="joy-right-base"></div>
+<div class="joystick-knob" id="joy-right-knob"></div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- ============ LIBRARIES ============ -->
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script type="module">
+// =============================================================================
+// SKETCH BRAWL — Single-file indie multiplayer
+// =============================================================================
+
+// ---------------------------------------------------------------------------
+// 0. CONFIGURATION
+// ---------------------------------------------------------------------------
+const CONFIG = {
+  WIDTH: 1280,
+  HEIGHT: 720,
+  TERRAIN_COLS: 64,
+  TERRAIN_ROWS: 36,
+  PLAYER_RADIUS: 16,
+  PROJECTILE_RADIUS: 4,
+  PARTICLE_MAX: 600,
+  ROUND_DURATION_MS: 90_000,
+  TICK_RATE: 30, // network ticks per second
+  MIN_PLAYERS: 2,
+  MAX_PLAYERS: 8,
+  // PeerJS config — replace with your own TURN if needed
+  PEER_CONFIG: {
+    debug: 1,
+    config: {
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" }
+      ]
+    }
+  },
+  // Supabase config — optional; if omitted, a localStorage fallback is used
+  SUPABASE_URL: "",   // e.g. "https://xxxx.supabase.co"
+  SUPABASE_ANON_KEY: "",
+};
+
+// ---------------------------------------------------------------------------
+// 1. WEAPON MANIFEST — auto-discovery
+// ---------------------------------------------------------------------------
+// Add new weapon folder names here. Each folder must contain:
+//   <name>/script.js  (ES module default-exporting a weapon definition)
+//   <name>/<name>.png (sprite; fallback used if missing)
+const WEAPON_MANIFEST = ["gun", "sword"];
+
+// ---------------------------------------------------------------------------
+// 2. UTILITY HELPERS
+// ---------------------------------------------------------------------------
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const rand = (min, max) => Math.random() * (max - min) + min;
+const randInt = (min, max) => Math.floor(rand(min, max + 1));
+const dist = (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1);
+const uid = () => Math.random().toString(36).slice(2, 10);
+
+function showToast(msg, duration = 2200) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.remove("show"), duration);
+}
+
+function setScreen(id) {
+  document.querySelectorAll(".screen").forEach((s) => s.classList.add("hidden"));
+  const target = document.getElementById(id);
+  if (target) target.classList.remove("hidden");
+}
+
+function showHUD(show) {
+  document.getElementById("hud").classList.toggle("visible", show);
+}
+
+// ---------------------------------------------------------------------------
+// 3. CANVAS SETUP
+// ---------------------------------------------------------------------------
+const canvas = document.getElementById("game-canvas");
+const ctx = canvas.getContext("2d", {
+  desynchronized: true,       // reduces latency on iPad
+  alpha: false,
+});
+
+let DPR = 1;
+let W = 0, H = 0;
+
+function resize() {
+  DPR = window.devicePixelRatio || 1;
+  W = window.innerWidth;
+  H = window.innerHeight;
+
+  canvas.width = Math.round(W * DPR);
+  canvas.height = Math.round(H * DPR);
+  canvas.style.width = W + "px";
+  canvas.style.height = H + "px";
+
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+
+  // Rebuild world scale to fit the screen while preserving aspect
+  const scale = Math.min(W / CONFIG.WIDTH, H / CONFIG.HEIGHT);
+  worldScale = scale;
+  worldOffsetX = (W - CONFIG.WIDTH * scale) / 2;
+  worldOffsetY = (H - CONFIG.HEIGHT * scale) / 2;
+}
+window.addEventListener("resize", resize);
+resize();
+
+let worldScale = 1;
+let worldOffsetX = 0;
+let worldOffsetY = 0;
+
+// Convert screen -> world coords
+function screenToWorld(sx, sy) {
+  return {
+    x: (sx - worldOffsetX) / worldScale,
+    y: (sy - worldOffsetY) / worldScale,
+  };
+}
+function worldToScreen(wx, wy) {
+  return {
+    x: wx * worldScale + worldOffsetX,
+    y: wy * worldScale + worldOffsetY,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 4. ROUGH.JS SETUP (hand-drawn aesthetic)
+// ---------------------------------------------------------------------------
+const rc = rough.canvas(canvas);
+const ROUGH_STYLE = {
+  roughness: 1.6,
+  bowing: 2.2,
+  stroke: "#1a1a2e",
+  strokeWidth: 2,
+  fillStyle: "solid",
+};
+
+function sketchRect(x, y, w, h, opts = {}) {
+  rc.rectangle(x, y, w, h, { ...ROUGH_STYLE, ...opts });
+}
+function sketchCircle(cx, cy, d, opts = {}) {
+  rc.circle(cx, cy, d, { ...ROUGH_STYLE, ...opts });
+}
+function sketchLine(x1, y1, x2, y2, opts = {}) {
+  rc.line(x1, y1, x2, y2, { ...ROUGH_STYLE, ...opts });
+}
+
+// ---------------------------------------------------------------------------
+// 5. TERRAIN & DESTRUCTION
+// ---------------------------------------------------------------------------
+const COLS = CONFIG.TERRAIN_COLS;
+const ROWS = CONFIG.TERRAIN_ROWS;
+const CELL_W = CONFIG.WIDTH / COLS;
+const CELL_H = CONFIG.HEIGHT / ROWS;
+
+// 0 = empty, 1 = solid, 0.5 = dented
+const terrain = new Float32Array(COLS * ROWS);
+const terrainDirty = new Set(); // indices changed since last render
+
+function terrainIndex(col, row) {
+  return row * COLS + col;
+}
+
+function isSolidAt(wx, wy) {
+  const col = Math.floor(wx / CELL_W);
+  const row = Math.floor(wy / CELL_H);
+  if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return true; // walls
+  return terrain[terrainIndex(col, row)] > 0.6;
+}
+
+function carveCircle(wx, wy, radius, depth = 1.0) {
+  const startCol = Math.max(0, Math.floor((wx - radius) / CELL_W));
+  const endCol = Math.min(COLS - 1, Math.floor((wx + radius) / CELL_W));
+  const startRow = Math.max(0, Math.floor((wy - radius) / CELL_H));
+  const endRow = Math.min(ROWS - 1, Math.floor((wy + radius) / CELL_H));
+
+  for (let r = startRow; r <= endRow; r++) {
+    for (let c = startCol; c <= endCol; c++) {
+      const cx = (c + 0.5) * CELL_W;
+      const cy = (r + 0.5) * CELL_H;
+      const d = dist(wx, wy, cx, cy);
+      if (d < radius) {
+        const idx = terrainIndex(c, r);
+        const falloff = 1 - d / radius;
+        terrain[idx] = Math.max(0, terrain[idx] - depth * falloff * 2);
+        terrainDirty.add(idx);
+      }
+    }
+  }
+}
+
+function initTerrain() {
+  terrain.fill(0);
+  // Border walls
+  for (let c = 0; c < COLS; c++) {
+    for (let r = 0; r < ROWS; r++) {
+      if (c === 0 || c === COLS - 1 || r === 0 || r === ROWS - 1) {
+        terrain[terrainIndex(c, r)] = 1;
+      }
+    }
+  }
+  // Some pre-existing cover blocks
+  const blocks = [
+    [10, 8, 6, 3],
+    [48, 10, 5, 4],
+    [30, 14, 8, 2],
+    [22, 22, 4, 6],
+    [40, 20, 6, 3],
+  ];
+  blocks.forEach(([c, r, w, h]) => {
+    for (let dy = 0; dy < h; dy++) {
+      for (let dx = 0; dx < w; dx++) {
+        const cc = c + dx, rr = r + dy;
+        if (cc > 0 && cc < COLS - 1 && rr > 0 && rr < ROWS - 1) {
+          terrain[terrainIndex(cc, rr)] = 1;
+        }
+      }
+    }
+  });
+  terrainDirty.clear();
+}
+
+// ---------------------------------------------------------------------------
+// 6. PARTICLE SYSTEM (object-pooled, zero-GC hot path)
+// ---------------------------------------------------------------------------
+const particles = [];
+const particlePool = [];
+
+function spawnParticle(x, y, vx, vy, life, size, color, gravity = 800) {
+  let p = particlePool.pop();
+  if (!p) {
+    p = {};
+  }
+  p.x = x;
+  p.y = y;
+  p.vx = vx;
+  p.vy = vy;
+  p.life = life;
+  p.maxLife = life;
+  p.size = size;
+  p.color = color;
+  p.gravity = gravity;
+  p.active = true;
+  if (particles.length < CONFIG.PARTICLE_MAX) {
+    particles.push(p);
+  } else {
+    // Replace oldest
+    const old = particles.shift();
+    particlePool.push(old);
+    particles.push(p);
+  }
+}
+
+function spawnImpactVFX(x, y, direction = 0, count = 18) {
+  const palette = ["#fff8e7", "#ffd166", "#ff9f1c", "#e94560", "#8b1e3f"];
+  for (let i = 0; i < count; i++) {
+    const angle = direction + rand(-1.2, 1.2);
+    const speed = rand(80, 420);
+    spawnParticle(
+      x, y,
+      Math.cos(angle) * speed,
+      Math.sin(angle) * speed - rand(40, 160),
+      rand(0.35, 0.9),
+      rand(1.5, 4),
+      palette[randInt(0, palette.length - 1)]
+    );
+  }
+  // A few heavier debris chunks
+  for (let i = 0; i < 5; i++) {
+    const angle = rand(0, Math.PI * 2);
+    const speed = rand(40, 120);
+    spawnParticle(
+      x, y,
+      Math.cos(angle) * speed,
+      Math.sin(angle) * speed - rand(60, 140),
+      rand(0.6, 1.4),
+      rand(3, 6),
+      "#5c4d3c"
+    );
+  }
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) {
+      particles.splice(i, 1);
+      particlePool.push(p);
+      continue;
+    }
+    p.vy += p.gravity * dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    // Floor bounce
+    if (p.y > CONFIG.HEIGHT - 4) {
+      p.y = CONFIG.HEIGHT - 4;
+      p.vy *= -0.35;
+      p.vx *= 0.7;
+    }
+  }
+}
+
+function drawParticles() {
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (const p of particles) {
+    const t = p.life / p.maxLife; // 1 = fresh, 0 = dead
+    // Heat gradient: white-hot -> orange -> cherry red
+    let color;
+    if (t > 0.7) color = "rgba(255, 248, 231, " + t + ")";
+    else if (t > 0.4) color = "rgba(255, 159, 28, " + (t * 1.2) + ")";
+    else color = "rgba(233, 69, 96, " + (t * 1.5) + ")";
+
+    // Velocity stretching (comet trail)
+    const stretch = 0.03;
+    const tailX = p.x - p.vx * stretch;
+    const tailY = p.y - p.vy * stretch;
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = p.size * t;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(tailX, tailY);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// 7. WEAPON LOADER (auto-discovery)
+// ---------------------------------------------------------------------------
+const weaponDefs = new Map(); // name -> { def, image, imageLoaded }
+
+async function loadWeapons() {
+  for (const name of WEAPON_MANIFEST) {
+    try {
+      const mod = await import(`./weapons/${name}/script.js`);
+      const def = mod.default;
+      weaponDefs.set(name, {
+        def,
+        image: null,
+        imageLoaded: false,
+      });
+      loadWeaponImage(name);
+    } catch (err) {
+      console.warn(`[weapons] failed to load "${name}" definition:`, err);
+    }
+  }
+}
+
+function loadWeaponImage(name) {
+  const entry = weaponDefs.get(name);
+  if (!entry) return;
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.onload = () => {
+    entry.image = img;
+    entry.imageLoaded = true;
+  };
+  img.onerror = () => {
+    console.warn(`[weapons] PNG missing for "${name}" — using fallback texture.`);
+    entry.image = null;
+    entry.imageLoaded = false;
+  };
+  // Convention: weapons/<name>/<name>.png
+  img.src = `./weapons/${name}/${name}.png`;
+}
+
+function getWeaponImage(name) {
+  const entry = weaponDefs.get(name);
+  if (entry && entry.imageLoaded && entry.image) return entry.image;
+  return null; // caller draws fallback
+}
+
+function drawWeaponFallback(sx, sy, size) {
+  // Crossed-out square — the "no texture" indicator
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.fillStyle = "#2a2a3e";
+  ctx.fillRect(-size / 2, -size / 2, size, size);
+  ctx.strokeStyle = "#e94560";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-size / 2, -size / 2, size, size);
+  ctx.beginPath();
+  ctx.moveTo(-size / 2, -size / 2);
+  ctx.lineTo(size / 2, size / 2);
+  ctx.moveTo(size / 2, -size / 2);
+  ctx.lineTo(-size / 2, size / 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// 8. NETWORKING (PeerJS + room directory)
+// ---------------------------------------------------------------------------
+const NET = {
+  peer: null,
+  isHost: false,
+  roomId: null,
+  connections: new Map(), // peerId -> DataConnection
+  hostConnection: null,   // client only
+  players: new Map(),     // playerId -> player state
+  localPlayerId: null,
+  tickInterval: null,
+  lastTick: 0,
+  roomDirectory: [],
+  supabase: null,
+  useSupabase: false,
+};
+
+function initSupabase() {
+  if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY && window.supabase) {
+    NET.supabase = window.supabase.createClient(
+      CONFIG.SUPABASE_URL,
+      CONFIG.SUPABASE_ANON_KEY
+    );
+    NET.useSupabase = true;
+    console.log("[net] Supabase room directory enabled.");
+  } else {
+    console.log("[net] Supabase not configured — using localStorage fallback.");
+  }
+}
+
+// ----- Room directory (Supabase or localStorage) -----
+async function publishRoom(roomId, playerCount = 1) {
+  const record = {
+    room_id: roomId,
+    host_peer_id: roomId,
+    game_type_identifier: "sketch-brawl",
+    status: "waiting",
+    max_players: CONFIG.MAX_PLAYERS,
+    current_players: playerCount,
+    updated_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + 10 * 60_000).toISOString(),
+  };
+
+  if (NET.useSupabase) {
+    try {
+      await NET.supabase.from("game_rooms").upsert(record);
+    } catch (e) {
+      console.warn("[net] supabase publish failed", e);
+    }
+  } else {
+    const rooms = JSON.parse(localStorage.getItem("sketchbrawl_rooms") || "[]");
+    const filtered = rooms.filter((r) => Date.now() < new Date(r.expires_at).getTime());
+    const idx = filtered.findIndex((r) => r.room_id === roomId);
+    if (idx >= 0) filtered[idx] = record;
+    else filtered.push(record);
+    localStorage.setItem("sketchbrawl_rooms", JSON.stringify(filtered));
+  }
+}
+
+async function fetchRooms() {
+  if (NET.useSupabase) {
+    try {
+      const { data } = await NET.supabase
+        .from("game_rooms")
+        .select("*")
+        .eq("game_type_identifier", "sketch-brawl")
+        .gt("expires_at", new Date().toISOString());
+      return data || [];
+    } catch (e) {
+      console.warn("[net] supabase fetch failed", e);
+      return [];
+    }
+  } else {
+    const rooms = JSON.parse(localStorage.getItem("sketchbrawl_rooms") || "[]");
+    return rooms.filter((r) => Date.now() < new Date(r.expires_at).getTime());
+  }
+}
+
+async function removeRoom(roomId) {
+  if (NET.useSupabase) {
+    try {
+      await NET.supabase.from("game_rooms").delete().eq("room_id", roomId);
+    } catch (e) {
+      /* ignore */
+    }
+  } else {
+    const rooms = JSON.parse(localStorage.getItem("sketchbrawl_rooms") || "[]");
+    localStorage.setItem(
+      "sketchbrawl_rooms",
+      JSON.stringify(rooms.filter((r) => r.room_id !== roomId))
+    );
+  }
+}
+
+// ----- Peer creation -----
+function createPeer(id) {
+  return new Peer(id || undefined, CONFIG.PEER_CONFIG);
+}
+
+function hostRoom() {
+  const roomId = "SB-" + uid().toUpperCase();
+  NET.isHost = true;
+  NET.roomId = roomId;
+  NET.localPlayerId = roomId;
+  NET.peer = createPeer(roomId);
+
+  NET.peer.on("open", async () => {
+    console.log("[net] host peer open:", roomId);
+    await publishRoom(roomId, 1);
+    showToast(`Room created: ${roomId}`, 3000);
+    updateLobbyUI();
+    setScreen("screen-lobby");
+  });
+
+  NET.peer.on("connection", (conn) => {
+    console.log("[net] incoming connection:", conn.peer);
+    setupHostConnection(conn);
+  });
+
+  NET.peer.on("error", (err) => {
+    console.error("[net] host error:", err);
+    showToast("Network error: " + err.type);
+  });
+}
+
+function setupHostConnection(conn) {
+  conn.on("open", () => {
+    NET.connections.set(conn.peer, conn);
+    // Send welcome + current state
+    conn.send({
+      type: "welcome",
+      playerId: conn.peer,
+      roomId: NET.roomId,
+      players: serializePlayers(),
+      round: GAME.round,
+    });
+    // Add player
+    addPlayer(conn.peer, "Player " + (NET.players.size + 1));
+    broadcastToAll({ type: "player-joined", playerId: conn.peer });
+    updateLobbyUI();
+  });
+
+  conn.on("data", (data) => {
+    handleHostMessage(conn.peer, data);
+  });
+
+  conn.on("close", () => {
+    NET.connections.delete(conn.peer);
+    removePlayer(conn.peer);
+    broadcastToAll({ type: "player-left", playerId: conn.peer });
+    updateLobbyUI();
+  });
+
+  conn.on("error", (err) => {
+    console.warn("[net] connection error:", err);
+  });
+}
+
+function joinRoom(roomId) {
+  NET.isHost = false;
+  NET.roomId = roomId;
+  NET.localPlayerId = "P-" + uid().toUpperCase();
+  NET.peer = createPeer(NET.localPlayerId);
+
+  NET.peer.on("open", () => {
+    console.log("[net] client peer open:", NET.localPlayerId);
+    const conn = NET.peer.connect(roomId, { reliable: true });
+    NET.hostConnection = conn;
+
+    conn.on("open", () => {
+      console.log("[net] connected to host");
+      showToast("Connected!");
+    });
+
+    conn.on("data", (data) => {
+      handleClientMessage(data);
+    });
+
+    conn.on("close", () => {
+      showToast("Disconnected from host.");
+      setScreen("screen-menu");
+    });
+
+    conn.on("error", (err) => {
+      console.error("[net] client connection error:", err);
+      showToast("Connection failed.");
+      setScreen("screen-menu");
+    });
+  });
+
+  NET.peer.on("error", (err) => {
+    console.error("[net] client peer error:", err);
+    showToast("Could not join room: " + err.type);
+  });
+}
+
+function broadcastToAll(msg) {
+  NET.connections.forEach((conn) => {
+    if (conn.open) conn.send(msg);
+  });
+}
+
+function sendToHost(msg) {
+  if (NET.hostConnection && NET.hostConnection.open) {
+    NET.hostConnection.send(msg);
+  }
+}
+
+// ----- Host message handling -----
+function handleHostMessage(fromPeer, data) {
+  switch (data.type) {
+    case "input":
+      // Store input for next tick
+      const p = NET.players.get(fromPeer);
+      if (p) {
+        p.input = data.input;
+      }
+      break;
+    case "fire":
+      handlePlayerFire(fromPeer, data);
+      break;
+    case "set-name":
+      const player = NET.players.get(fromPeer);
+      if (player) {
+        player.name = data.name.slice(0, 16);
+        broadcastToAll({ type: "player-updated", player: serializePlayer(player) });
+        updateLobbyUI();
+      }
+      break;
+  }
+}
+
+// ----- Client message handling -----
+function handleClientMessage(data) {
+  switch (data.type) {
+    case "welcome":
+      NET.localPlayerId = data.playerId;
+      NET.roomId = data.roomId;
+      data.players.forEach((p) => NET.players.set(p.id, p));
+      NET.players.forEach((p) => (p.isLocal = p.id === NET.localPlayerId));
+      GAME.round = data.round || 1;
+      updateLobbyUI();
+      setScreen("screen-lobby");
+      break;
+    case "state":
+      // Full authoritative state snapshot
+      applyStateSnapshot(data.state);
+      break;
+    case "player-joined":
+      showToast("A player joined.");
+      break;
+    case "player-left":
+      NET.players.delete(data.playerId);
+      updateLobbyUI();
+      break;
+    case "player-updated":
+      NET.players.set(data.player.id, data.player);
+      updateLobbyUI();
+      break;
+    case "round-start":
+      startRoundClient(data.round, data.weapons);
+      break;
+    case "round-end":
+      endRoundClient(data.winner, data.detail);
+      break;
+    case "impact":
+      spawnImpactVFX(data.x, data.y, data.direction || 0, data.count || 18);
+      if (data.carve) {
+        carveCircle(data.x, data.y, data.carve.radius, data.carve.depth);
+      }
+      break;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 9. PLAYER STATE
+// ---------------------------------------------------------------------------
+function makePlayer(id, name) {
+  return {
+    id,
+    name: name || "Player",
+    x: rand(200, CONFIG.WIDTH - 200),
+    y: rand(200, CONFIG.HEIGHT - 200),
+    vx: 0,
+    vy: 0,
+    hp: 100,
+    maxHp: 100,
+    angle: 0,
+    alive: true,
+    weapon: null,       // { name, def, used }
+    input: { moveX: 0, moveY: 0, aimX: 0, aimY: 0, firing: false },
+    lastFire: 0,
+    isLocal: false,
+  };
+}
+
+function addPlayer(id, name) {
+  if (NET.players.has(id)) return;
+  const p = makePlayer(id, name);
+  NET.players.set(id, p);
+  return p;
+}
+
+function removePlayer(id) {
+  NET.players.delete(id);
+}
+
+function serializePlayer(p) {
+  return {
+    id: p.id,
+    name: p.name,
+    x: p.x,
+    y: p.y,
+    hp: p.hp,
+    maxHp: p.maxHp,
+    angle: p.angle,
+    alive: p.alive,
+    weaponName: p.weapon ? p.weapon.name : null,
+    weaponUsed: p.weapon ? p.weapon.used : false,
+    isLocal: p.isLocal,
+  };
+}
+
+function serializePlayers() {
+  return Array.from(NET.players.values()).map(serializePlayer);
+}
+
+function applyStateSnapshot(state) {
+  state.players.forEach((sp) => {
+    let p = NET.players.get(sp.id);
+    if (!p) {
+      p = makePlayer(sp.id, sp.name);
+      NET.players.set(sp.id, p);
+    }
+    p.x = sp.x;
+    p.y = sp.y;
+    p.hp = sp.hp;
+    p.maxHp = sp.maxHp;
+    p.angle = sp.angle;
+    p.alive = sp.alive;
+    p.weaponName = sp.weaponName;
+    p.weaponUsed = sp.weaponUsed;
+    p.isLocal = sp.id === NET.localPlayerId;
+    if (sp.weaponName) {
+      const entry = weaponDefs.get(sp.weaponName);
+      if (entry) {
+        p.weapon = {
+          name: sp.weaponName,
+          def: entry.def,
+          used: sp.weaponUsed,
+        };
+      }
+    } else {
+      p.weapon = null;
+    }
+  });
+  GAME.round = state.round;
+  GAME.timeLeft = state.timeLeft;
+}
+
+// ---------------------------------------------------------------------------
+// 10. GAME STATE
+// ---------------------------------------------------------------------------
+const GAME = {
+  running: false,
+  round: 1,
+  timeLeft: CONFIG.ROUND_DURATION_MS / 1000,
+  projectiles: [],
+  swords: [],       // active sword swings
+  winner: null,
+  roundActive: false,
+};
+
+// ---------------------------------------------------------------------------
+// 11. INPUT HANDLING (iPad-optimized pointer events)
+// ---------------------------------------------------------------------------
+const input = {
+  leftPointer: null,
+  rightPointer: null,
+  leftStart: { x: 0, y: 0 },
+  rightStart: { x: 0, y: 0 },
+  leftCurrent: { x: 0, y: 0 },
+  rightCurrent: { x: 0, y: 0 },
+  firing: false,
+  aimAngle: 0,
+};
+
+const joyLeftBase = document.getElementById("joy-left-base");
+const joyLeftKnob = document.getElementById("joy-left-knob");
+const joyRightBase = document.getElementById("joy-right-base");
+const joyRightKnob = document.getElementById("joy-right-knob");
+
+function showJoystick(base, knob, cx, cy) {
+  base.style.display = "block";
+  knob.style.display = "block";
+  base.style.left = cx + "px";
+  base.style.top = cy + "px";
+  knob.style.left = cx + "px";
+  knob.style.top = cy + "px";
+}
+function moveJoystick(base, knob, cx, cy, dx, dy) {
+  const maxDist = 40;
+  const mag = Math.hypot(dx, dy);
+  const scale = mag > maxDist ? maxDist / mag : 1;
+  knob.style.left = cx + dx * scale + "px";
+  knob.style.top = cy + dy * scale + "px";
+}
+function hideJoystick(base, knob) {
+  base.style.display = "none";
+  knob.style.display = "none";
+}
+
+// Determine which half of the screen a pointer is on
+function getPointerZone(pointerType, clientX) {
+  // For pencil, treat as "right" (aim) by default
+  if (pointerType === "pen") return "right";
+  return clientX < W / 2 ? "left" : "right";
+}
+
+canvas.addEventListener("pointerdown", (e) => {
+  if (!GAME.roundActive) return;
+  e.preventDefault();
+  canvas.setPointerCapture(e.pointerId);
+
+  const zone = getPointerZone(e.pointerType, e.clientX);
+
+  if (zone === "left" && !input.leftPointer) {
+    input.leftPointer = e.pointerId;
+    input.leftStart = { x: e.clientX, y: e.clientY };
+    input.leftCurrent = { x: e.clientX, y: e.clientY };
+    showJoystick(joyLeftBase, joyLeftKnob, e.clientX, e.clientY);
+  } else if (zone === "right" && !input.rightPointer) {
+    input.rightPointer = e.pointerId;
+    input.rightStart = { x: e.clientX, y: e.clientY };
+    input.rightCurrent = { x: e.clientX, y: e.clientY };
+    showJoystick(joyRightBase, joyRightKnob, e.clientX, e.clientY);
+    input.firing = true;
+  }
+}, { passive: false });
+
+canvas.addEventListener("pointermove", (e) => {
+  if (!GAME.roundActive) return;
+  if (e.pointerId === input.leftPointer) {
+    input.leftCurrent = { x: e.clientX, y: e.clientY };
+    const dx = e.clientX - input.leftStart.x;
+    const dy = e.clientY - input.leftStart.y;
+    moveJoystick(joyLeftBase, joyLeftKnob, input.leftStart.x, input.leftStart.y, dx, dy);
+  } else if (e.pointerId === input.rightPointer) {
+    input.rightCurrent = { x: e.clientX, y: e.clientY };
+    const dx = e.clientX - input.rightStart.x;
+    const dy = e.clientY - input.rightStart.y;
+    moveJoystick(joyRightBase, joyRightKnob, input.rightStart.x, input.rightStart.y, dx, dy);
+    // Aim angle
+    const world = screenToWorld(e.clientX, e.clientY);
+    const me = NET.players.get(NET.localPlayerId);
+    if (me) {
+      input.aimAngle = Math.atan2(world.y - me.y, world.x - me.x);
+    }
+  }
+}, { passive: false });
+
+canvas.addEventListener("pointerup", (e) => {
+  if (e.pointerId === input.leftPointer) {
+    input.leftPointer = null;
+    hideJoystick(joyLeftBase, joyLeftKnob);
+  }
+  if (e.pointerId === input.rightPointer) {
+    input.rightPointer = null;
+    input.firing = false;
+    hideJoystick(joyRightBase, joyRightKnob);
+  }
+}, { passive: false });
+
+canvas.addEventListener("pointercancel", (e) => {
+  if (e.pointerId === input.leftPointer) {
+    input.leftPointer = null;
+    hideJoystick(joyLeftBase, joyLeftKnob);
+  }
+  if (e.pointerId === input.rightPointer) {
+    input.rightPointer = null;
+    input.firing = false;
+    hideJoystick(joyRightBase, joyRightKnob);
+  }
+}, { passive: false });
+
+// Prevent context menu / zoom
+canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+document.addEventListener("gesturestart", (e) => e.preventDefault());
+
+// ---------------------------------------------------------------------------
+// 12. INPUT PROCESSING (per frame)
+// ---------------------------------------------------------------------------
+function processLocalInput() {
+  const me = NET.players.get(NET.localPlayerId);
+  if (!me || !me.alive) return;
+
+  // Movement from left joystick
+  let moveX = 0, moveY = 0;
+  if (input.leftPointer) {
+    const dx = input.leftCurrent.x - input.leftStart.x;
+    const dy = input.leftCurrent.y - input.leftStart.y;
+    const mag = Math.hypot(dx, dy);
+    if (mag > 8) {
+      moveX = dx / mag;
+      moveY = dy / mag;
+    }
+  }
+
+  // Aiming from right joystick
+  let aimX = me.x + Math.cos(input.aimAngle) * 100;
+  let aimY = me.y + Math.sin(input.aimAngle) * 100;
+
+  const inp = {
+    moveX,
+    moveY,
+    aimX,
+    aimY,
+    firing: input.firing,
+  };
+
+  if (NET.isHost) {
+    me.input = inp;
+    // Host directly processes
+  } else {
+    sendToHost({ type: "input", input: inp });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 13. COMBAT LOGIC (host-authoritative)
+// ---------------------------------------------------------------------------
+function handlePlayerFire(playerId, data) {
+  if (!NET.isHost) return;
+  const player = NET.players.get(playerId);
+  if (!player || !player.alive || !player.weapon || player.weapon.used) return;
+
+  const def = player.weapon.def;
+  const now = performance.now();
+  if (now - player.lastFire < (def.cooldown || 0)) return;
+
+  player.lastFire = now;
+  player.weapon.used = true;
+  player.weaponUsed = true;
+
+  const angle = Math.atan2(data.aimY - player.y, data.aimX - player.x);
+  player.angle = angle;
+
+  if (def.type === "gun") {
+    // Spawn projectile
+    const speed = def.projectileSpeed || 800;
+    const proj = {
+      owner: playerId,
+      x: player.x + Math.cos(angle) * 24,
+      y: player.y + Math.sin(angle) * 24,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      damage: def.damage || 20,
+      color: def.projectileColor || "#ffdd55",
+      life: 2.0,
+      radius: CONFIG.PROJECTILE_RADIUS,
+    };
+    GAME.projectiles.push(proj);
+    // Broadcast projectile spawn
+    broadcastToAll({
+      type: "impact",
+      x: proj.x,
+      y: proj.y,
+      direction: angle,
+      count: 6,
+      carve: null,
+    });
+  } else if (def.type === "sword") {
+    // Sword swing: instant hit in an arc
+    const arc = Math.PI * 0.8;
+    const range = def.range || 90;
+    GAME.swords.push({
+      owner: playerId,
+      x: player.x,
+      y: player.y,
+      angle,
+      range,
+      arc,
+      life: 0.2,
+      damage: def.damage || 35,
+    });
+    // Check hits
+    for (const [id, other] of NET.players) {
+      if (id === playerId || !other.alive) continue;
+      const d = dist(player.x, player.y, other.x, other.y);
+      if (d < range + CONFIG.PLAYER_RADIUS) {
+        const angleToOther = Math.atan2(other.y - player.y, other.x - player.x);
+        let diff = Math.abs(angleToOther - angle);
+        while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
+        if (diff < arc / 2) {
+          other.hp -= (def.damage || 35);
+          if (other.hp <= 0) {
+            other.hp = 0;
+            other.alive = false;
+          }
+          spawnImpactVFX(other.x, other.y, angle, 25);
+          broadcastToAll({
+            type: "impact",
+            x: other.x,
+            y: other.y,
+            direction: angle,
+            count: 25,
+            carve: { radius: 18, depth: 0.5 },
+          });
+        }
+      }
+    }
+  }
+
+  // Check round end
+  checkRoundEnd();
+}
+
+function updateProjectiles(dt) {
+  for (let i = GAME.projectiles.length - 1; i >= 0; i--) {
+    const p = GAME.projectiles[i];
+    p.life -= dt;
+    if (p.life <= 0) {
+      GAME.projectiles.splice(i, 1);
+      continue;
+    }
+
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+
+    // Out of bounds
+    if (p.x < 0 || p.x > CONFIG.WIDTH || p.y < 0 || p.y > CONFIG.HEIGHT) {
+      GAME.projectiles.splice(i, 1);
+      continue;
+    }
+
+    // Terrain collision
+    if (isSolidAt(p.x, p.y)) {
+      carveCircle(p.x, p.y, 22, 0.8);
+      spawnImpactVFX(p.x, p.y, Math.atan2(p.vy, p.vx), 22);
+      broadcastToAll({
+        type: "impact",
+        x: p.x,
+        y: p.y,
+        direction: Math.atan2(p.vy, p.vx),
+        count: 22,
+        carve: { radius: 22, depth: 0.8 },
+      });
+      GAME.projectiles.splice(i, 1);
+      continue;
+    }
+
+    // Player collision (host authority)
+    if (NET.isHost) {
+      for (const [id, player] of NET.players) {
+        if (id === p.owner || !player.alive) continue;
+        if (dist(p.x, p.y, player.x, player.y) < CONFIG.PLAYER_RADIUS + p.radius) {
+          player.hp -= p.damage;
+          if (player.hp <= 0) {
+            player.hp = 0;
+            player.alive = false;
+          }
+          spawnImpactVFX(p.x, p.y, Math.atan2(p.vy, p.vx), 28);
+          broadcastToAll({
+            type: "impact",
+            x: p.x,
+            y: p.y,
+            direction: Math.atan2(p.vy, p.vx),
+            count: 28,
+            carve: { radius: 12, depth: 0.4 },
+          });
+          GAME.projectiles.splice(i, 1);
+          break;
+        }
+      }
+    }
+  }
+}
+
+function updateSwords(dt) {
+  for (let i = GAME.swords.length - 1; i >= 0; i--) {
+    GAME.swords[i].life -= dt;
+    if (GAME.swords[i].life <= 0) GAME.swords.splice(i, 1);
+  }
+}
+
+function checkRoundEnd() {
+  if (!NET.isHost || !GAME.roundActive) return;
+  const alive = Array.from(NET.players.values()).filter((p) => p.alive);
+  if (alive.length <= 1) {
+    GAME.roundActive = false;
+    GAME.winner = alive.length === 1 ? alive[0].id : null;
+    const detail = GAME.winner
+      ? `${NET.players.get(GAME.winner).name} wins!`
+      : "Draw — everyone eliminated.";
+    broadcastToAll({ type: "round-end", winner: GAME.winner, detail });
+    endRoundClient(GAME.winner, detail);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 14. ROUND MANAGEMENT
+// ---------------------------------------------------------------------------
+function assignRandomWeapon(player) {
+  const names = Array.from(weaponDefs.keys());
+  if (names.length === 0) return;
+  const name = names[randInt(0, names.length - 1)];
+  const entry = weaponDefs.get(name);
+  player.weapon = { name, def: entry.def, used: false };
+  player.weaponUsed = false;
+}
+
+function startRoundHost() {
+  if (!NET.isHost) return;
+  GAME.round++;
+  GAME.roundActive = true;
+  GAME.timeLeft = CONFIG.ROUND_DURATION_MS / 1000;
+  GAME.projectiles = [];
+  GAME.swords = [];
+  GAME.winner = null;
+
+  // Reset players
+  NET.players.forEach((p) => {
+    p.alive = true;
+    p.hp = p.maxHp;
+    p.x = rand(200, CONFIG.WIDTH - 200);
+    p.y = rand(200, CONFIG.HEIGHT - 200);
+    p.vx = 0;
+    p.vy = 0;
+    assignRandomWeapon(p);
+  });
+
+  // Broadcast round start with weapon assignments
+  const weapons = {};
+  NET.players.forEach((p, id) => {
+    weapons[id] = p.weapon ? p.weapon.name : null;
+  });
+  broadcastToAll({ type: "round-start", round: GAME.round, weapons });
+
+  startRoundClient(GAME.round, weapons);
+}
+
+function startRoundClient(round, weapons) {
+  GAME.round = round;
+  GAME.roundActive = true;
+  GAME.timeLeft = CONFIG.ROUND_DURATION_MS / 1000;
+  GAME.projectiles = [];
+  GAME.swords = [];
+  GAME.winner = null;
+
+  NET.players.forEach((p, id) => {
+    p.alive = true;
+    p.hp = p.maxHp;
+    const wname = weapons[id];
+    if (wname && weaponDefs.has(wname)) {
+      p.weapon = { name: wname, def: weaponDefs.get(wname).def, used: false };
+      p.weaponUsed = false;
+    }
+  });
+
+  updateHUDWeapon();
+  showHUD(true);
+  setScreen(null); // hide all screens
+  document.querySelectorAll(".screen").forEach((s) => s.classList.add("hidden"));
+}
+
+function endRoundClient(winnerId, detail) {
+  GAME.roundActive = false;
+  showHUD(false);
+  document.getElementById("round-over-title").textContent =
+    winnerId ? "VICTORY" : "DRAW";
+  document.getElementById("round-over-detail").textContent = detail;
+  setScreen("screen-round-over");
+}
+
+// ---------------------------------------------------------------------------
+// 15. HOST GAME LOOP (authoritative simulation)
+// ---------------------------------------------------------------------------
+function hostTick(dt) {
+  if (!GAME.roundActive) return;
+
+  // Process player inputs
+  NET.players.forEach((p) => {
+    if (!p.alive) return;
+    const inp = p.input;
+    if (!inp) return;
+
+    // Movement
+    const speed = 260;
+    p.vx = inp.moveX * speed;
+    p.vy = inp.moveY * speed;
+
+    // Apply movement with terrain collision
+    const nx = p.x + p.vx * dt;
+    const ny = p.y + p.vy * dt;
+    if (!isSolidAt(nx, p.y)) p.x = clamp(nx, CONFIG.PLAYER_RADIUS, CONFIG.WIDTH - CONFIG.PLAYER_RADIUS);
+    if (!isSolidAt(p.x, ny)) p.y = clamp(ny, CONFIG.PLAYER_RADIUS, CONFIG.HEIGHT - CONFIG.PLAYER_RADIUS);
+
+    // Aim angle
+    p.angle = Math.atan2(inp.aimY - p.y, inp.aimX - p.x);
+
+    // Firing
+    if (inp.firing && p.weapon && !p.weapon.used) {
+      handlePlayerFire(p.id, inp);
+    }
+  });
+
+  updateProjectiles(dt);
+  updateSwords(dt);
+  updateParticles(dt);
+
+  GAME.timeLeft -= dt;
+  if (GAME.timeLeft <= 0) {
+    GAME.timeLeft = 0;
+    // Time out — player with most HP wins
+    const sorted = Array.from(NET.players.values())
+      .filter((p) => p.alive)
+      .sort((a, b) => b.hp - a.hp);
+    GAME.winner = sorted.length ? sorted[0].id : null;
+    const detail = GAME.winner
+      ? `${NET.players.get(GAME.winner).name} wins on HP!`
+      : "Time up — draw.";
+    broadcastToAll({ type: "round-end", winner: GAME.winner, detail });
+    endRoundClient(GAME.winner, detail);
+    GAME.roundActive = false;
+    return;
+  }
+
+  // Broadcast state snapshot at TICK_RATE
+  const now = performance.now();
+  if (now - NET.lastTick > 1000 / CONFIG.TICK_RATE) {
+    NET.lastTick = now;
+    broadcastToAll({
+      type: "state",
+      state: {
+        players: serializePlayers(),
+        round: GAME.round,
+        timeLeft: GAME.timeLeft,
+      },
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 16. RENDERING
+// ---------------------------------------------------------------------------
+function drawTerrain() {
+  // Draw solid cells as sketchy rectangles
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const val = terrain[terrainIndex(c, r)];
+      if (val <= 0.05) continue;
+
+      const x = c * CELL_W;
+      const y = r * CELL_H;
+      const alpha = clamp(val, 0, 1);
+
+      // Base fill with slight color variation
+      ctx.fillStyle = `rgba(92, 77, 60, ${alpha})`;
+      ctx.fillRect(x, y, CELL_W + 1, CELL_H + 1);
+
+      // Sketchy outline only for boundary cells
+      if (val > 0.6) {
+        const hasEmptyNeighbor =
+          !isSolidAt(x - 1, y) ||
+          !isSolidAt(x + CELL_W + 1, y) ||
+          !isSolidAt(x, y - 1) ||
+          !isSolidAt(x, y + CELL_H + 1);
+        if (hasEmptyNeighbor) {
+          sketchRect(x, y, CELL_W, CELL_H, {
+            stroke: "#3d3228",
+            strokeWidth: 1.5,
+            roughness: 1.8,
+            fill: "none",
+          });
+        }
+      }
+    }
+  }
+}
+
+function drawPlayer(p) {
+  if (!p.alive) return;
+
+  const sx = p.x;
+  const sy = p.y;
+  const r = CONFIG.PLAYER_RADIUS;
+
+  // Shadow
+  ctx.save();
+  ctx.globalAlpha = 0.2;
+  ctx.fillStyle = "#000";
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + r * 0.8, r * 0.9, r * 0.35, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Body (capsule)
+  const bodyColor = p.isLocal ? "#e94560" : "#4a7c9b";
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.rotate(p.angle);
+
+  // Capsule body via rounded rect
+  const bw = r * 1.1;
+  const bh = r * 2.2;
+  ctx.fillStyle = bodyColor;
+  ctx.beginPath();
+  ctx.roundRect(-bw / 2, -bh / 2, bw, bh, r * 0.5);
+  ctx.fill();
+
+  // Sketchy outline on body
+  sketchCircle(0, 0, r * 2.1, {
+    stroke: "#1a1a2e",
+    strokeWidth: 1.8,
+    roughness: 1.5,
+    fill: "none",
+  });
+
+  // Head (circle)
+  ctx.fillStyle = p.isLocal ? "#ff6b8a" : "#6ba3c7";
+  ctx.beginPath();
+  ctx.arc(0, -r * 1.1, r * 0.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#1a1a2e";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Weapon indicator (small icon at hand position)
+  if (p.weapon) {
+    const img = getWeaponImage(p.weapon.name);
+    const wx = r * 0.9;
+    const wy = 0;
+    if (img) {
+      ctx.drawImage(img, wx - 10, wy - 10, 20, 20);
+    } else {
+      // Fallback tiny marker
+      ctx.fillStyle = "#ffdd55";
+      ctx.fillRect(wx - 3, wy - 3, 6, 6);
+    }
+  }
+
+  ctx.restore();
+
+  // HP bar above head
+  const barW = 36;
+  const barH = 5;
+  const bx = sx - barW / 2;
+  const by = sy - r * 2.4;
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fillRect(bx, by, barW, barH);
+  const hpRatio = p.hp / p.maxHp;
+  ctx.fillStyle = hpRatio > 0.5 ? "#4ade80" : hpRatio > 0.25 ? "#facc15" : "#ef4444";
+  ctx.fillRect(bx, by, barW * hpRatio, barH);
+
+  // Name
+  ctx.fillStyle = "rgba(245,240,232,0.8)";
+  ctx.font = "10px -apple-system, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(p.name, sx, by - 4);
+}
+
+function drawProjectiles() {
+  for (const p of GAME.projectiles) {
+    ctx.save();
+    ctx.fillStyle = p.color;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawSwords() {
+  for (const s of GAME.swords) {
+    const alpha = s.life / 0.2;
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.6;
+    ctx.strokeStyle = "#f5f0e8";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.range, s.angle - s.arc / 2, s.angle + s.arc / 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawVignette() {
+  const grad = ctx.createRadialGradient(
+    CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2, CONFIG.HEIGHT * 0.3,
+    CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2, CONFIG.HEIGHT * 0.85
+  );
+  grad.addColorStop(0, "rgba(0,0,0,0)");
+  grad.addColorStop(1, "rgba(0,0,0,0.45)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+}
+
+function render() {
+  // Clear
+  ctx.fillStyle = "#f5f0e8";
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.translate(worldOffsetX, worldOffsetY);
+  ctx.scale(worldScale, worldScale);
+
+  // World bounds
+  ctx.fillStyle = "#e8e0d0";
+  ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+  drawTerrain();
+  drawProjectiles();
+  drawSwords();
+
+  NET.players.forEach((p) => drawPlayer(p));
+
+  drawParticles();
+  drawVignette();
+
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// 17. HUD UPDATE
+// ---------------------------------------------------------------------------
+function updateHUDWeapon() {
+  const me = NET.players.get(NET.localPlayerId);
+  const iconEl = document.getElementById("hud-weapon-icon");
+  const nameEl = document.getElementById("hud-weapon-name");
+  const statusEl = document.getElementById("hud-weapon-status");
+
+  if (!me || !me.weapon) {
+    iconEl.className = "no-texture";
+    iconEl.innerHTML = "";
+    nameEl.textContent = "—";
+    statusEl.textContent = "NO WEAPON";
+    return;
+  }
+
+  const img = getWeaponImage(me.weapon.name);
+  if (img) {
+    iconEl.className = "";
+    iconEl.innerHTML = "";
+    const i = document.createElement("img");
+    i.src = img.src;
+    i.alt = me.weapon.name;
+    i.style.width = "40px";
+    i.style.height = "40px";
+    i.style.objectFit = "contain";
+    iconEl.appendChild(i);
+  } else {
+    iconEl.className = "no-texture";
+    iconEl.innerHTML = "";
+  }
+
+  nameEl.textContent = me.weapon.name;
+  statusEl.textContent = me.weapon.used ? "USED" : "READY";
+  statusEl.style.color = me.weapon.used ? "#666" : "#e94560";
+}
+
+function updateHUD() {
+  document.getElementById("hud-round").textContent = `ROUND ${GAME.round}`;
+  const mins = Math.floor(GAME.timeLeft / 60);
+  const secs = Math.floor(GAME.timeLeft % 60);
+  document.getElementById("hud-timer").textContent =
+    `${mins}:${secs.toString().padStart(2, "0")}`;
+  const alive = Array.from(NET.players.values()).filter((p) => p.alive).length;
+  document.getElementById("hud-players").textContent = `${alive} alive`;
+  updateHUDWeapon();
+}
+
+function updateLobbyUI() {
+  const codeEl = document.getElementById("lobby-code-display");
+  if (codeEl) codeEl.textContent = `Room code: ${NET.roomId || "—"}`;
+  const playersEl = document.getElementById("lobby-players");
+  if (playersEl) playersEl.textContent = `Players: ${NET.players.size}`;
+}
+
+// ---------------------------------------------------------------------------
+// 18. MAIN LOOP
+// ---------------------------------------------------------------------------
+let lastFrame = performance.now();
+
+function mainLoop(timestamp) {
+  const dt = Math.min((timestamp - lastFrame) / 1000, 0.05);
+  lastFrame = timestamp;
+
+  // Process local input every frame
+  if (GAME.roundActive) {
+    processLocalInput();
+  }
+
+  // Host simulation
+  if (NET.isHost && GAME.roundActive) {
+    hostTick(dt);
+  } else if (!NET.isHost) {
+    // Client: still update particles locally for smooth VFX
+    updateParticles(dt);
+    updateProjectiles(0); // visual only
+    updateSwords(dt);
+  }
+
+  // Render
+  render();
+
+  // HUD
+  if (GAME.roundActive) {
+    updateHUD();
+  }
+
+  requestAnimationFrame(mainLoop);
+}
+
+// ---------------------------------------------------------------------------
+// 19. UI EVENT BINDINGS
+// ---------------------------------------------------------------------------
+document.getElementById("btn-start-host").addEventListener("click", () => {
+  hostRoom();
+});
+
+document.getElementById("btn-show-join").addEventListener("click", async () => {
+  setScreen("screen-servers");
+  const list = document.getElementById("room-list");
+  list.innerHTML = '<p style="color:rgba(245,240,232,0.4);text-align:center;font-size:0.85rem;">Scanning…</p>';
+  const rooms = await fetchRooms();
+  list.innerHTML = "";
+  if (rooms.length === 0) {
+    list.innerHTML = '<p style="color:rgba(245,240,232,0.4);text-align:center;font-size:0.85rem;">No open rooms. Host one!</p>';
+  } else {
+    rooms.forEach((r) => {
+      const div = document.createElement("div");
+      div.className = "room-item";
+      div.innerHTML = `<span>${r.room_id}</span><span class="count">${r.current_players}/${r.max_players}</span>`;
+      div.addEventListener("click", () => {
+        joinRoom(r.room_id);
+      });
+      list.appendChild(div);
+    });
+  }
+});
+
+document.getElementById("btn-join-code").addEventListener("click", () => {
+  const code = document.getElementById("join-code-input").value.trim().toUpperCase();
+  if (code) joinRoom(code);
+});
+
+document.getElementById("btn-back-menu").addEventListener("click", () => {
+  setScreen("screen-menu");
+});
+
+document.getElementById("btn-begin-round").addEventListener("click", () => {
+  if (NET.isHost && NET.players.size >= CONFIG.MIN_PLAYERS) {
+    startRoundHost();
+  } else {
+    showToast("Need at least " + CONFIG.MIN_PLAYERS + " players.");
+  }
+});
+
+document.getElementById("btn-leave-lobby").addEventListener("click", async () => {
+  if (NET.isHost) await removeRoom(NET.roomId);
+  if (NET.peer) NET.peer.destroy();
+  NET.peer = null;
+  NET.connections.clear();
+  NET.players.clear();
+  setScreen("screen-menu");
+});
+
+document.getElementById("btn-next-round").addEventListener("click", () => {
+  if (NET.isHost) {
+    startRoundHost();
+  } else {
+    // Client waits for host to start; go back to lobby
+    setScreen("screen-lobby");
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 20. BOOTSTRAP
+// ---------------------------------------------------------------------------
+async function boot() {
+  initSupabase();
+  initTerrain();
+  await loadWeapons();
+
+  // Set up local player placeholder (will be replaced by host welcome)
+  NET.players.set(NET.localPlayerId || "local", makePlayer(NET.localPlayerId || "local", "You"));
+
+  // Start render loop
+  requestAnimationFrame(mainLoop);
+
+  // Show menu
+  setScreen("screen-menu");
+  console.log("[boot] Sketch Brawl ready. Weapons loaded:", Array.from(weaponDefs.keys()));
+}
+
+boot();
+</script>
+</body>
+</html>
