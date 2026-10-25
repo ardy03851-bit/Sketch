@@ -5,25 +5,25 @@
 //  missing you get the pink/black "no texture" square instead.
 // ─────────────────────────────────────────────────────────────
 Weapon({
-  name: "Revolver",
+  name: "Rocky mk.1",
   type: "gun",              // "gun" (shoots) or "melee" (swings + slides)
   weight: 1,                // how often it is rolled at round start (higher = more common)
 
   // ── damage ──────────────────────────────────────────────
-  damage: 34,               // per bullet (players have 100 hp)
-  knockback: 520,           // push on hit (px/s)
+  damage: 67,               // per bullet (players have 100 hp)
+  knockback: 750,           // push on hit (px/s)
   headshot: 1.5,            // multiplier when the bullet hits the top of the body
 
   // ── firing ──────────────────────────────────────────────
-  fireRate: 2.6,            // shots per second
-  ammo: 106,                  // shots per round (0 = infinite). When empty you shove with your fists.
+  fireRate: 0.6,            // shots per second
+  ammo: 30,                  // shots per round (0 = infinite). When empty you shove with your fists.
   automatic: false,         // hold to keep firing
   bullets: 1,               // pellets per shot (shotgun = 6+)
   spread: 0.025,            // radians of random spread
   bulletSpeed: 2300,        // px/s
   bulletGravity: 120,       // px/s² drop (0 = laser straight)
   range: 1700,              // px before the bullet fizzles
-  recoil: 210,              // pushes the shooter backwards (px/s)
+  recoil: 300,              // pushes the shooter backwards (px/s)
   bounces: 0,               // ricochets off terrain
 
   // ── how the PNG is held ─────────────────────────────────
