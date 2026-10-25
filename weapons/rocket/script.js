@@ -38,11 +38,11 @@ Weapon({
 
   // ── map destruction ─────────────────────────────────────
   destruction: {
-    crater: 13,             // crater radius in px (0 = no hole)
+    crater: 70,             // crater radius in px (0 = no hole)
     jagged: 0.35,           // 0 round … 1 very broken edges
-    debris: 9,              // chunks thrown out
-    dust: 1,                // dust cloud amount 0..2
-    scorch: 0.55,           // burn mark darkness 0..1
+    debris: 12,              // chunks thrown out
+    dust: 11,                // dust cloud amount 0..2
+    scorch: 5,           // burn mark darkness 0..1
     dent: true              // also press a soft dent ring around the hole
   },
 
